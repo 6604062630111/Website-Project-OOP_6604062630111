@@ -1,0 +1,98 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Library System</title>
+<style>
+body { font-family: Arial, sans-serif; max-width: 900px; margin: 30px auto; padding: 0 16px; color: #222; }
+h1 { margin-bottom: 4px; }
+form { display: flex; gap: 8px; flex-wrap: wrap; margin: 16px 0; }
+input, select, button { padding: 8px; font-size: 14px; }
+table { width: 100%; border-collapse: collapse; }
+th, td { border-bottom: 1px solid #ddd; padding: 8px; text-align: left; }
+.ok { color: #1a7f37; font-weight: bold; }
+.out { color: #b42318; font-weight: bold; }
+#msg { color: #b42318; min-height: 20px; }
+</style>
+</head>
+<body>
+<h1>Library System</h1>
+<p>Borrow and return books, magazines and DVDs.</p>
+<form id="addForm">
+<select name="type">
+<option value="BOOK">Book</option>
+<option value="MAGAZINE">Magazine</option>
+<option value="DVD">DVD</option>
+</select>
+<input name="title" placeholder="Title" required>
+<input name="detail" placeholder="Author / Issue / Director" required>
+<button type="submit">Add item</button>
+</form>
+<div id="msg"></div>
+<table>
+<thead>
+<tr><th>ID</th><th>Type</th><th>Title</th><th>Detail</th><th>Loan days</th><th>Status</th><th>Actions</th></tr>
+</thead>
+<tbody id="rows"></tbody>
+</table>
+<script>
+async function post(url, data) {
+  const res = await fetch(url, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+    body: new URLSearchParams(data).toString()
+  });
+  const json = await res.json();
+  document.getElementById('msg').textContent = json.error || '';
+  load();
+}
+function cell(text) {
+  const td = document.createElement('td');
+  td.textContent = text;
+  return td;
+}
+function button(label, action) {
+  const b = document.createElement('button');
+  b.textContent = label;
+  b.onclick = action;
+  return b;
+}
+async function load() {
+  const res = await fetch('/api/items');
+  const items = await res.json();
+  const rows = document.getElementById('rows');
+  rows.innerHTML = '';
+  items.forEach(item => {
+    const tr = document.createElement('tr');
+    tr.appendChild(cell(item.id));
+    tr.appendChild(cell(item.type));
+    tr.appendChild(cell(item.title));
+    tr.appendChild(cell(item.detailLabel + ': ' + item.detail));
+    tr.appendChild(cell(item.loanDays));
+    const status = cell(item.available ? 'Available' : 'Borrowed by ' + item.borrower);
+    status.className = item.available ? 'ok' : 'out';
+    tr.appendChild(status);
+    const actions = document.createElement('td');
+    if (item.available) {
+      actions.appendChild(button('Borrow', () => {
+        const name = prompt('Borrower name');
+        if (name) post('/api/borrow', { id: item.id, borrower: name });
+      }));
+    } else {
+      actions.appendChild(button('Return', () => post('/api/return', { id: item.id })));
+    }
+    actions.appendChild(button('Delete', () => post('/api/delete', { id: item.id })));
+    tr.appendChild(actions);
+    rows.appendChild(tr);
+  });
+}
+document.getElementById('addForm').onsubmit = e => {
+  e.preventDefault();
+  post('/api/add', Object.fromEntries(new FormData(e.target)));
+  e.target.reset();
+};
+load();
+</script>
+</body>
+</html>
